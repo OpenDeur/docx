@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import xml from "xml";
 
 import { File } from "@file/file";
+import { obfuscate } from "@file/fonts/obfuscate-ttf-to-odttf";
 
 import { Formatter } from "../formatter";
 import { ImageReplacer } from "./image-replacer";
@@ -31,6 +32,8 @@ interface IXmlifyedFileMapping {
     readonly FootNotesRelationships: IXmlifyedFile;
     readonly Settings: IXmlifyedFile;
     readonly Comments?: IXmlifyedFile;
+    readonly FontTable?: IXmlifyedFile;
+    readonly FontTableRelationships?: IXmlifyedFile;
 }
 
 export class Compiler {
@@ -61,6 +64,10 @@ export class Compiler {
 
         for (const { stream, fileName } of file.Media.Array) {
             zip.file(`word/media/${fileName}`, stream);
+        }
+
+        for (const { data: buffer, name } of file.FontTable.options) {
+            zip.file(`word/fonts/${name}`, obfuscate(buffer, name));
         }
 
         return zip;
@@ -438,6 +445,40 @@ export class Compiler {
                     },
                 ),
                 path: "word/comments.xml",
+            },
+            FontTable: {
+                data: xml(
+                    this.formatter.format(file.FontTable.View, {
+                        viewWrapper: file.Document,
+                        file,
+                        stack: [],
+                    }),
+                    {
+                        indent: prettify,
+                        declaration: {
+                            standalone: "yes",
+                            encoding: "UTF-8",
+                        },
+                    },
+                ),
+                path: "word/fontTable.xml",
+            },
+            FontTableRelationships: {
+                data: (() =>
+                    xml(
+                        this.formatter.format(file.FontTable.Relationships, {
+                            viewWrapper: file.Document,
+                            file,
+                            stack: [],
+                        }),
+                        {
+                            indent: prettify,
+                            declaration: {
+                                encoding: "UTF-8",
+                            },
+                        },
+                    ))(),
+                path: "word/_rels/fontTable.xml.rels",
             },
         };
     }
